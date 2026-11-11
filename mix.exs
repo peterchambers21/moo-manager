@@ -16,7 +16,7 @@ defmodule MooManager.MixProject do
   def application do
     [
       extra_applications: [:logger],
-      mod: {MooManager.Application, []}
+      mod: {Cattle.Application, []}
     ]
   end
 

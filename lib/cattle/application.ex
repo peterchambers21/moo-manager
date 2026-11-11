@@ -4,7 +4,9 @@ defmodule Cattle.Application do
   def start(_type, _args) do
     children = [
       Cattle.Repo,
-      {Registry, keys: :unique, name: Cattle.Registry, partitions: System.schedulers_online()},
+      {Registry,
+       keys: :unique, name: Cattle.CattleRegistry, partitions: System.schedulers_online()},
+      {Task.Supervisor, name: Cattle.TaskSupervisor},
       {Cattle.CowSupervisor, []}
     ]
 

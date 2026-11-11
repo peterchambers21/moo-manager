@@ -10,9 +10,10 @@ defmodule CattleManager do
 
   ## Concurrency
 
-  Herd queries use `Task.async_stream/3` so calls to many cows happen in **parallel**.
-  A slow or unavailable cow won't stall the entire computation—slow/failed tasks
-  are skipped.
+  Herd queries use `Task.Supervisor.async_stream_nolink/4` (under
+  `Cattle.TaskSupervisor`) so calls to many cows happen in **parallel**.
+  A slow, crashed, or missing cow won't stall or crash the entire
+  computation: its result is skipped.
 
   ### Defaults
     * `max_concurrency`: `System.schedulers_online/0`
@@ -35,7 +36,14 @@ defmodule CattleManager do
   # Parallel map with sensible defaults; yields only successful results.
   defp pmap(enumerable, fun, opts \\ []) do
     enumerable
-    |> Task.async_stream(fun, Keyword.merge(@default_task_opts, opts))
+    |> then(
+      &Task.Supervisor.async_stream_nolink(
+        Cattle.TaskSupervisor,
+        &1,
+        fun,
+        Keyword.merge(@default_task_opts, opts)
+      )
+    )
     |> Stream.filter(&match?({:ok, _}, &1))
     |> Stream.map(fn {:ok, v} -> v end)
   end
@@ -46,17 +54,18 @@ defmodule CattleManager do
   # ---------- single-cow wrappers ----------
 
   @doc """
-  Starts a new cow process with the provided attributes.
+  Starts a new cow process under `Cattle.CowSupervisor`.
 
-  The `state` is expected to include:
-    * `:id` (used to register the process in `Cattle.CattleRegistry`)
-    * typically `:age`, `:health`, and `:location`
+  The `id` is used to register the process in `Cattle.CattleRegistry`, so it
+  must be unique; starting a second cow with the same id returns
+  `{:error, {:already_started, pid}}`.
 
-  Returns a standard `GenServer.on_start()` tuple.
+  Returns a `DynamicSupervisor.on_start_child()` tuple.
   """
-  @spec start_cow(term(), non_neg_integer(), term(), term()) :: GenServer.on_start()
+  @spec start_cow(term(), non_neg_integer(), term(), term()) ::
+          DynamicSupervisor.on_start_child()
   def start_cow(id, age, health, location) do
-    Cattle.Cow.start_link(%{id: id, age: age, health: health, location: location})
+    Cattle.CowSupervisor.start_cow(%{id: id, age: age, health: health, location: location})
   end
 
   @doc "Returns the full state for a cow identified by `id`."
