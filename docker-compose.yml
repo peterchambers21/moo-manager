@@ -1,0 +1,15 @@
+services:
+  moo_manager:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    volumes:
+      # The SQLite database and generated secret are kept here.
+      - moo_data:/data
+    # environment:
+    #   PHX_HOST: moo.example.com   # set when serving on a public domain
+    #   PHX_SCHEME: https           # when behind an HTTPS reverse proxy
+
+volumes:
+  moo_data:
